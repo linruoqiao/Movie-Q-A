@@ -15,9 +15,12 @@ from models.document_model import (
 )
 from .base import engine
 
+# 文档管理系统，包括：上传（add）、修改（update）、删除（delete）
+# 分页查询（page）、下载（download）、批量打标向量状态（vector_all_docs）
+
 
 class DocumentCrud:
-    __BASE_PATH = "/home/ly/Project"
+    __BASE_PATH = "E://Data mining//finalwork//example//py-doc-qa-deepseek-server//app"
     __FILE_PATH = "/fileStorage"
 
     async def __save_file(self, file: UploadFile = File()):
@@ -121,6 +124,7 @@ class DocumentCrud:
                 count_query = count_query.where(Document.name.contains(name))
                 query = query.where(Document.name.contains(name))
 
+            # 没有进行赋值？
             query.order_by(desc(Document.date)).offset(offset).limit(limit)
 
             total = session.exec(count_query).one()
@@ -133,6 +137,7 @@ class DocumentCrud:
                 "list": list,
             }
 
+    # 下载文件，根据uuid获取文档记录
     def download(self, item_id: uuid.UUID):
         with Session(engine) as session:
             document = session.get(Document, item_id)
@@ -144,6 +149,7 @@ class DocumentCrud:
 
             return file_path, real_name
 
+    # 将数据库中所有文档的vector字段改为“yes”
     def vector_all_docs(self):
         with Session(engine) as session:
             query = select(Document)

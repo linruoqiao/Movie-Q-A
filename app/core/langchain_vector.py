@@ -52,7 +52,7 @@ def load_documents(source_dir=LOAD_PATH):
             show_progress=True,  # 显示加载进度
             use_multithreading=True,  # 使用多线程
             loader_cls=TextLoader,  # 指定加载器
-            loader_kwargs={"autodetect_encoding": True},  # 自动检测文件编码
+            loader_kwargs={"encoding": "utf-8"},  # 自动检测文件编码,
         )
 
         pdf_loader = DirectoryLoader(

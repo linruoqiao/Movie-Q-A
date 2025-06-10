@@ -9,6 +9,7 @@ from FlagEmbedding import FlagModel
 from langchain_community.chat_models import ChatZhipuAI
 
 import os
+from pathlib import Path
 from openai import OpenAI
 
 """
@@ -17,17 +18,23 @@ from openai import OpenAI
 
 API_KEY = ""
 """LLM模型 API Key"""
+BASE_DIR = "E://Data mining//finalwork//example//py-doc-qa-deepseek-server//app"
 
-LOAD_PATH = "/home/ly/Project/fileStorage"
+# LOAD_PATH = "/home/ly/Project/fileStorage"
+LOAD_PATH = os.path.join(BASE_DIR, "fileStorage")
+os.makedirs(LOAD_PATH, exist_ok=True)
+
 """指定加载文档的目录"""
-
-VECTOR_DIR = "/home/ly/Project/vector_store"
+VECTOR_DIR = os.path.join(BASE_DIR, "vector_store")
+os.makedirs(VECTOR_DIR, exist_ok=True)
+# VECTOR_DIR = "/home/ly/Project/vector_store"
 """指定持久化向量数据库的存储路径"""
 
 MODEL_NAME = "deepseek-r1:7b"
 """指定大语言模型名称"""
 
-EMBEDDING_MODEL_PATH = "/home/ly/Project/Models/Embedding/bge-base-zh-v1.5"
+# EMBEDDING_MODEL_PATH = "/home/ly/Project/Models/Embedding/bge-base-zh-v1.5"
+EMBEDDING_MODEL_PATH = "BAAI/bge-base-zh-v1.5"
 """本地 embedding 模型路径"""
 
 OLLAMA_EMBEDDING_NAME = "nomic-embed-text"
@@ -80,7 +87,7 @@ def chroma_vector_store():
     return Chroma(
         persist_directory=VECTOR_DIR,
         collection_name=COLLECTION_NAME,
-        embedding_function=embeddings_model(),
+        embedding_function=embeddings_model(),  # 配置向量化模型
     )
 
 
