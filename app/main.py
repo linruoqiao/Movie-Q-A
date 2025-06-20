@@ -11,7 +11,7 @@ from routers import chat_router
 from routers import chat_session_router
 from routers import document_router
 
-#上传文件
+# 上传文件
 import os
 import shutil
 import tempfile
@@ -20,9 +20,17 @@ from typing import List
 from fastapi import File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 
+from flask_cors import CORS
 
 # FastAPI 主入口
 app = FastAPI()
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 允许所有来源（生产环境应限制）
+    allow_methods=["*"],  # 允许所有方法
+)
 
 # 将 fastApi 子模块整合到 app 中
 app.include_router(chat_router.router)
@@ -47,11 +55,10 @@ def read_root():
 
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
+
 def allowed_file(filename: str) -> bool:
-    return (
-        '.' in filename
-        and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-    )
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 @app.post("/analysis_image", response_model=dict)
 async def analysis_image(
@@ -67,8 +74,7 @@ async def analysis_image(
         for file in files:
             if not allowed_file(file.filename):
                 raise HTTPException(
-                    status_code=400,
-                    detail="仅支持 png/jpg/jpeg 格式图片"
+                    status_code=400, detail="仅支持 png/jpg/jpeg 格式图片"
                 )
 
             # 保存文件到临时目录
@@ -85,8 +91,7 @@ async def analysis_image(
             raise HTTPException(status_code=500, detail=f"服务异常: {str(e)}")
 
     return JSONResponse(
-        {"code": 200, "message": "分析完成", "result": prompts},
-        status_code=200
+        {"code": 200, "message": "分析完成", "result": prompts}, status_code=200
     )
 
 
