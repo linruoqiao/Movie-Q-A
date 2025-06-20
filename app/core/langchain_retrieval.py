@@ -23,15 +23,46 @@ def build_history_template(chat_history_list: list[ChatHistory]):
 
 
 # 构建问答链
+from langchain_core.tools import Tool
+from duckduckgo_search import DDGS
+from langchain_openai import ChatOpenAI
+from langchain.agents import initialize_agent, AgentType
+# 定义搜索工具函数
+# ----------------- 搜索工具 -----------------
+def web_search(query: str, max_results: int = 5):
+    try:
+        with DDGS() as ddgs:
+            return [
+                f"{i+1}. {r.get('title','')} - {r.get('url','')}\n    {r.get('body','')}"
+                for i, r in enumerate(ddgs.text(query, max_results=max_results))
+            ]
+    except Exception:
+        return []
 
+search_tool = Tool(
+    name="web_search",
+    func=web_search,
+    description="联网实时搜索电影/剧集信息"
+)
 
+from langchain.memory import ConversationBufferMemory
+# 初始化记忆组件
+memory = ConversationBufferMemory(
+    memory_key="chat_history",
+    return_messages=True
+)
 def build_qa_chain():
 
     # 初始化 Chroma 向量数据库
     vector_store = chroma_vector_store()
 
-    # 初始化 deepseek 模型
+
+     # ② LLM & 记忆
     llm = chat_llm()
+    memory = ConversationBufferMemory(
+        memory_key="chat_history",
+        return_messages=True
+    )
 
     # 初始化检索，并配置
     # 使用mmr的检索算法，
@@ -54,6 +85,7 @@ def build_qa_chain():
     #     文档内容：{context}
     #     """
     # 电影问答
+
     system_template = """
     你是一位专业的电影和剧集信息问答助手，具备强大的知识检索与理解能力，能够帮助用户准确、高效地查询电影与电视剧的各种信息。
 
@@ -64,7 +96,11 @@ def build_qa_chain():
     - 推荐与某部作品相似的其他作品
     - 根据类型（如科幻、爱情、悬疑等）或上映年代筛选作品
 
-    你始终依赖检索到的文档内容进行回答，不可凭空编造。同时，需要读取文档中所有有关的信息。当文档中没有足够信息支撑回答时，你应回复：“抱歉，暂时没有相关信息。”
+    你依赖检索到的文档内容进行回答，不可凭空编造。同时，需要读取文档中所有有关的信息。当文档中没有足够信息支撑回答时，你应联网搜索相关的电影信息并回复，
+    检索结果：  
+    【联网搜索】\n{web_results}\n\n
+
+    如果联网没有搜索到相关的电影信息，则回复：“抱歉，暂时没有相关信息。”
 
     你服务于希望获取影视信息的普通用户，回答应通俗易懂、条理清晰，如有需要可适当使用行业术语，但需简洁解释。
 
@@ -75,7 +111,8 @@ def build_qa_chain():
         [
             ("system", system_template),
             MessagesPlaceholder("chat_history"),
-            ("human", "{question}"),
+            ("human", "{question}")
+            
         ]
     )
 
@@ -86,8 +123,9 @@ def build_qa_chain():
     return (
         {
             "context": lambda x: retriever.invoke(x["question"]),
+            "web_results": lambda x: search_tool.func(x["question"]),
             "chat_history": lambda x: x["chat_history"],
-            "question": lambda x: x["question"],
+            "question": lambda x: x["question"]
         }
         | prompt
         | llm
