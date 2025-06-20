@@ -30,7 +30,7 @@ os.makedirs(VECTOR_DIR, exist_ok=True)
 # VECTOR_DIR = "/home/ly/Project/vector_store"
 """指定持久化向量数据库的存储路径"""
 
-MODEL_NAME = "deepseek-r1:7b"
+MODEL_NAME = "DeepSeek-R1-0528"
 """指定大语言模型名称"""
 
 # EMBEDDING_MODEL_PATH = "/home/ly/Project/Models/Embedding/bge-base-zh-v1.5"
@@ -44,6 +44,7 @@ COLLECTION_NAME = "documents_qa"
 """向量数据库的集合名"""
 
 
+
 def chat_llm():
     """LLM 聊天模型"""
     # llm = ChatZhipuAI(
@@ -51,15 +52,36 @@ def chat_llm():
     #     api_key=API_KEY,
     #     streaming=True,
     # )
+    # if(MODEL_NAME=="deepseek-r1:7b"):
+    
+    #     llm = ChatOllama(
+    #     model=MODEL_NAME,
+    #     temperature=0.1,
+    #     streaming=True,
+    #     callbacks=[StreamingStdOutCallbackHandler()],
+    # )
+    # else:
+    from langchain_openai import ChatOpenAI
+    llm = ChatOpenAI(
+    model=MODEL_NAME,
+    api_key="sk-h7jNnP-gm7tAY-c3ox8nSw",
+    base_url="https://llmapi.blsc.cn/v1",
+    callbacks=[StreamingStdOutCallbackHandler()],
+    )
+    
+    return llm
+
+    
+    
 
     # 方式一：调用本地模型，调用 langchain_ollama 库下的 ChatOllama
     # 导入包：from langchain_ollama import ChatOllama
-    llm = ChatOllama(
-        model=MODEL_NAME,
-        temperature=0.1,
-        streaming=True,
-        callbacks=[StreamingStdOutCallbackHandler()],
-    )
+    # llm = ChatOllama(
+    #     model=MODEL_NAME,
+    #     temperature=0.1,
+    #     streaming=True,
+    #     callbacks=[StreamingStdOutCallbackHandler()],
+    # )
 
     # 方式二：调用 langchain_deepseek 库下的 ChatDeepSeek 工具类
     # 导入包：from langchain_deepseek import ChatDeepSeek
