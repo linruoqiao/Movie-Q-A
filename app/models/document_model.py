@@ -5,10 +5,9 @@ from fastapi import File, UploadFile
 from sqlmodel import Field, SQLModel
 from pydantic import BaseModel, field_validator
 
-class WebPageFormData(BaseModel):
+class URLRequest(BaseModel):
     name: str
-    content: str
-    source: str
+    url: str
 
 class Document(SQLModel, table=True):
     """document表"""
