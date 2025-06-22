@@ -155,5 +155,133 @@ def vector_documents():
     documents = load_documents()
     # 执行分割
     split_docs = split_documents(documents)
+
     # 执行向量化（使用之前分割好的split_docs）
     create_vector_store(split_docs)
+    # 抽取三元组并存入KG
+    triplets = process_documents(documents)
+    # store_triplets_to_neo4j(triplets)
+
+
+def triplet_extraction_prompt(text: str) -> str:
+    return f"""请从以下文本中提取三元组（实体1，关系，实体2）：
+文本：{text}
+输出格式：[(实体1, 关系, 实体2), ...]
+"""
+
+
+from openai import OpenAI  # or use any other LLM API you prefer
+
+from langchain_community.chat_models import ChatOpenAI  # DeepSeek 接口
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+import ast  # 更安全的字符串转结构方式
+
+API_KEY = "sk-h7jNnP-gm7tAY-c3ox8nSw"
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.messages import HumanMessage
+from langchain_ollama import ChatOllama
+
+MODEL_NAME = "deepseek-r1:7b"
+
+
+import re
+import os
+from langchain.chat_models import ChatOpenAI
+
+# 设置环境变量
+os.environ["OPENAI_API_KEY"] = API_KEY
+os.environ["OPENAI_API_BASE"] = "https://llmapi.blsc.cn/v1"  # 自定义模型地址
+from zhipuai import ZhipuAI
+
+# 初始化 ZhipuAI 客户端
+client = ZhipuAI(api_key="b05241d40957460c8b15d23f0cbabfda.maAt6j0cQNNa8GPD")
+
+
+import re
+
+
+def extract_triplets_from_text(text: str) -> list[tuple]:
+    prompt = f"""请从以下电影介绍中提取有价值的知识三元组（实体1，关系，实体2），要求：
+1. 仅提取对电影信息有帮助的事实性关系，如：导演、主演、编剧、上映时间、上映地区、改编自、类型、评分、语言、出品方、角色关系（如A 饰演 B）；
+2. 关系必须是有意义的事实，不要提取主观感受或模糊情绪，如“感人”“好看”“戳人”等；
+3. 如果没有可提取的三元组，请返回空列表 [];
+4. 输出格式严格为 Python 列表格式，如：[(实体1, 关系, 实体2), ...]；
+5. 输出中实体和关系都用半角双引号括起来，如 ("柳承龙", "主演", "7号房的礼物")
+
+文本内容：
+{text}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model="GLM-4-Flash-250414",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+        )
+
+        result_str = response.choices[0].message.content.strip()
+        print(f"ZhipuAI返回: {result_str}")
+
+        # 使用正则提取形如 ("实体1", "关系", "实体2") 的三元组
+        matches = re.findall(r'\("([^"]+)",\s*"([^"]+)",\s*"([^"]+)"\)', result_str)
+
+        triplets = [(e1.strip(), rel.strip(), e2.strip()) for e1, rel, e2 in matches]
+        return triplets
+
+    except Exception as e:
+        print(f"提取三元组失败: {e}")
+        return []
+
+
+from py2neo import Graph, Node, Relationship
+from neo4j import GraphDatabase
+
+# graph = Graph("bolt://localhost:7687", auth=("neo4j", "lrq20041224"))
+neo4j_driver = GraphDatabase.driver(
+    "bolt://localhost:7687",  # 你的 Neo4j 地址
+    auth=("neo4j", "lrq20041224"),  # 你的用户名和密码
+)
+
+
+# 插入三元组到Neo4j
+def insert_triplet_to_neo4j(triplet):
+    with neo4j_driver.session() as session:
+        e1, rel, e2 = triplet
+        session.run(
+            """
+            MERGE (h:Entity {name: $e1})
+            MERGE (t:Entity {name: $e2})
+            MERGE (h)-[:RELATION {type: $rel}]->(t)
+            """,
+            e1=e1,
+            rel=rel,
+            e2=e2,
+        )
+
+
+def process_documents(documents):
+    all_triplets = []
+    for doc in documents:
+        content = doc.page_content[:2000]  # 可酌情截断
+        triplets = extract_triplets_from_text(content)
+
+        for triplet in triplets:
+            print(f"插入三元组: {triplet}")
+            insert_triplet_to_neo4j(triplet)
+
+        all_triplets.extend(triplets)
+
+    print(f"共提取并插入三元组数: {len(all_triplets)}")
+    return all_triplets
+
+
+# def vector_documents_with_kg():
+#     documents = load_documents()
+#     split_docs = split_documents(documents)
+
+#     # 向量化原始内容
+#     create_vector_store(split_docs)
+
+#     # ⬇️ 新增：抽取三元组并存入KG
+#     triplets = process_documents(split_docs)
+#     # store_triplets_to_neo4j(triplets)
