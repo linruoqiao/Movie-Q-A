@@ -92,7 +92,7 @@ def chat_llm():
     # )
 
     # 方式三：调用 langchain_openai 库下的 ChatOpenAI 工具类
-    # 导入包：from langchain_openai import ChatOpenAI
+    # from langchain_openai import ChatOpenAI
     # llm = ChatOpenAI(
     #     model="deepseek-reasoner",
     #     api_key=API_KEY,
