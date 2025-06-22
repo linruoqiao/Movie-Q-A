@@ -2,3 +2,6 @@ __pycache__
 .idea
 **/*.db
 study
+app/fileStorage/
+app/vector_store/
+app/documents_qa/
