@@ -72,10 +72,28 @@ def combine_kg_and_docs(question: str, retriever) -> str:
         return doc_text or "未找到相关知识图谱或文档信息。"
 
 
+from langchain_core.tools import Tool
+from duckduckgo_search import DDGS
+from langchain_openai import ChatOpenAI
+from langchain.agents import initialize_agent, AgentType
+
+
+# 定义搜索工具函数
+# ----------------- 搜索工具 -----------------
+def web_search(query: str, max_results: int = 5):
+    try:
+        with DDGS() as ddgs:
+            return [
+                f"{i+1}. {r.get('title','')} - {r.get('url','')}\n    {r.get('body','')}"
+                for i, r in enumerate(ddgs.text(query, max_results=max_results))
+            ]
+    except Exception:
+        return []
+
+
 search_tool = Tool(
     name="web_search", func=web_search, description="联网实时搜索电影/剧集信息"
 )
-
 from langchain.memory import ConversationBufferMemory
 
 # 初始化记忆组件
@@ -117,7 +135,11 @@ def build_qa_chain():
     - 若知识图谱中包含相关三元组，应明确展示出来，例如：“根据知识图谱中的三元组 (柳承龙，主演，7号房的礼物)...”
     - 同时需要使用文档检索内容，但也请说明信息来源
 
-    你不可凭空编造。当知识图谱与文档均无相关内容时，请回复：“抱歉，暂时没有相关信息。”
+    你不可凭空编造。当知识图谱与文档均无相关内容时，你应联网搜索相关的电影信息并回复，
+    检索结果：  
+    【联网搜索】\n{web_results}\n\n
+
+    如果联网没有搜索到相关的电影信息，则回复：“抱歉，暂时没有相关信息。”
 
     以下是知识图谱与文档内容：
     {context}
