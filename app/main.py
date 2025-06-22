@@ -95,6 +95,53 @@ async def analysis_image(
     )
 
 
+from fastapi import APIRouter
+from neo4j import GraphDatabase
+
+router = APIRouter()
+
+# Neo4j 配置
+uri = "bolt://localhost:7687"
+user = "neo4j"
+password = "lrq20041224"
+
+driver = GraphDatabase.driver(uri, auth=(user, password))
+
+
+@app.get("/graph")
+async def get_graph():
+    with driver.session() as session:
+        result = session.run("MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 100")
+
+        nodes_map = {}
+        links = []
+
+        for record in result:
+            n = record["n"]
+            m = record["m"]
+            r = record["r"]
+
+            n_id = str(n.id)
+            m_id = str(m.id)
+
+            if n_id not in nodes_map:
+                nodes_map[n_id] = {
+                    "id": n_id,
+                    "name": n.get("name") or n.get("title") or "未命名",
+                    "category": list(n.labels)[0] if n.labels else "Entity",
+                }
+            if m_id not in nodes_map:
+                nodes_map[m_id] = {
+                    "id": m_id,
+                    "name": m.get("name") or m.get("title") or "未命名",
+                    "category": list(m.labels)[0] if m.labels else "Entity",
+                }
+
+            links.append({"source": n_id, "target": m_id, "name": r.type})
+
+        return JSONResponse(content={"nodes": list(nodes_map.values()), "links": links})
+
+
 if __name__ == "__main__":
     # 创建或启动数据库
     create_db_and_tables()
