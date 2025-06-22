@@ -14,15 +14,15 @@ from models.document_model import (
     UploadFormData,
 )
 from .base import engine
+from uuid import uuid4
 
 # 文档管理系统，包括：上传（add）、修改（update）、删除（delete）
 # 分页查询（page）、下载（download）、批量打标向量状态（vector_all_docs）
 
 
 class DocumentCrud:
-    __BASE_PATH = "E://Data mining//finalwork//example//py-doc-qa-deepseek-server//app"
+    __BASE_PATH = "E://code//LLM_RAG//Movie-Q-A//app"
     __FILE_PATH = "/fileStorage"
-
     async def __save_file(self, file: UploadFile = File()):
         """I/O操作，写入文件"""
 
@@ -158,3 +158,31 @@ class DocumentCrud:
                 doc.vector = "yes"
                 session.add(doc)
             session.commit()
+
+    async def add_from_url(self, name: str, url: str, content: str):
+        """通过URL创建文档记录（不上传文件）"""
+        # 使用 UUID 生成一个虚拟文件名，模拟文件信息
+        new_file_name = f"{uuid4()}.txt"
+        save_path = Path(self.__BASE_PATH + self.__FILE_PATH) / new_file_name
+        new_path = Path(self.__FILE_PATH) / new_file_name
+        new_file_path = str(new_path)
+        suffix = "txt"
+        with open(save_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        # 创建 DocumentUpdate 对象（或 Document 对象）
+        doc = DocumentUpdate(
+            name=name,
+            file_name=new_file_name,
+            file_path=new_file_path,
+            suffix=suffix,
+            vector="",
+        )
+
+        with Session(engine) as session:
+            db_document = Document.model_validate(doc)
+            session.add(db_document)
+            session.commit()
+            session.refresh(db_document)
+
+            # 可选：另建一张表存储正文内容，也可以在Document中加一个 content 字段
+            return db_document

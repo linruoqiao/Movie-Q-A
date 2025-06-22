@@ -9,9 +9,12 @@ from models.document_model import (
     DocumentResponse,
     UpdateFormData,
     UploadFormData,
+    URLRequest
 )
+import datetime
+from urlToTxt import URLTextExtractor
 from urllib.parse import quote
-from routers.base import success
+from routers.base import success,failure
 
 
 router = APIRouter(
@@ -60,3 +63,30 @@ async def vector_docs():
     vector_documents()
     document_crud.vector_all_docs()
     return success(None, "已全部向量化。")
+
+
+@router.post("/url_to_text")
+async def get_url_text(request_data: URLRequest):
+    extractor = URLTextExtractor()
+    print("✅ 收到 URL 提交请求")
+    try:
+        doc_name = request_data.name
+        url = request_data.url
+
+        result = extractor.extract_from_url(url)['text']
+        print(result)
+
+        # 保存到数据库
+        db_document = await document_crud.add_from_url(doc_name, url, result)
+
+        return success({
+            "document_id": db_document.id,
+            "document_name": db_document.name,
+            "document_url": url,
+            "content": result,
+            "status": "processed"
+        }, "网页内容提取并保存成功！")
+
+    except Exception as e:
+        return failure(500,f"处理URL文档失败: {str(e)}")
+

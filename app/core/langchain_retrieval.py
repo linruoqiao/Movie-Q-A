@@ -72,10 +72,26 @@ def combine_kg_and_docs(question: str, retriever) -> str:
         return doc_text or "未找到相关知识图谱或文档信息。"
 
 
+search_tool = Tool(
+    name="web_search", func=web_search, description="联网实时搜索电影/剧集信息"
+)
+
+from langchain.memory import ConversationBufferMemory
+
+# 初始化记忆组件
+memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+
 def build_qa_chain():
     """构建融合了文档 + 知识图谱的问答链"""
     vector_store = chroma_vector_store()
+
+    # ② LLM & 记忆
     llm = chat_llm()
+    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+
+    # 初始化检索，并配置
+    # 使用mmr的检索算法，
     retriever = vector_store.as_retriever(
         search_type="mmr",
         search_kwargs={
@@ -118,6 +134,7 @@ def build_qa_chain():
     return (
         {
             "context": lambda x: combine_kg_and_docs(x["question"], retriever),
+            "web_results": lambda x: search_tool.func(x["question"]),
             "chat_history": lambda x: x["chat_history"],
             "question": lambda x: x["question"],
         }
