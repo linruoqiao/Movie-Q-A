@@ -10,6 +10,11 @@ from py2neo import Graph
 # 初始化 Neo4j 图数据库连接
 graph = Graph("bolt://localhost:7687", auth=("neo4j", "lrq20041224"))
 
+from zhipuai import ZhipuAI
+
+# 初始化 ZhipuAI 客户端
+client = ZhipuAI(api_key="b05241d40957460c8b15d23f0cbabfda.maAt6j0cQNNa8GPD")
+
 
 def build_history_template(chat_history_list: list[ChatHistory]):
     """构建聊天历史模板"""
@@ -24,17 +29,57 @@ def build_history_template(chat_history_list: list[ChatHistory]):
     return history_messages
 
 
+def extract_entity_llm(question: str) -> str:
+    prompt = f"""从下面的问题中提取用户查询的核心电影或剧集关键词（可以是电影名、演员名、导演名等）：
+问题：{question}
+输出格式：只返回关键词，如：7号房的礼物"""
+    response = client.chat.completions.create(
+        model="GLM-4-Flash-250414",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1,
+    )
+    return response.choices[0].message.content.strip()
+
+
+def extract_search_query_from_question(question: str) -> str:
+    prompt = f"""请将下面的问题转化为用于搜索文档的关键词组合，去掉冗余表达，保留核心信息：
+问题：{question}
+只输出关键词组合，如：“评分高 感人 英文电影”
+"""
+    try:
+        response = client.chat.completions.create(
+            model="GLM-4-Flash-250414",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"关键词抽取失败：{e}")
+        return question  # 回退为原始问题
+
+
 def kg_query(question: str) -> str:
-    """根据问题从Neo4j知识图谱中检索相关三元组"""
+    keyword = extract_entity_llm(question)
+    if not keyword:
+        print("未提取到有效关键词")
+        return ""
+
     cypher = f"""
     MATCH (s)-[r]->(o)
-    WHERE s.name CONTAINS '{question}' OR o.name CONTAINS '{question}'
+    WHERE s.name CONTAINS '{keyword}' OR o.name CONTAINS '{keyword}'
     RETURN s.name AS subject, type(r) AS predicate, o.name AS object
     LIMIT 10
     """
+
     try:
+        print("\n[KG 查询语句]")
+        print(cypher.strip())
+
         results = graph.run(cypher).data()
+
+        print("\n[KG 查询结果]")
         if not results:
+            print("未找到相关三元组")
             return ""
         triples = [
             f"({r['subject']}，{r['predicate']}，{r['object']})" for r in results
@@ -46,7 +91,8 @@ def kg_query(question: str) -> str:
 
 def combine_kg_and_docs(question: str, retriever) -> str:
     """融合文档检索与知识图谱信息作为上下文"""
-    docs = retriever.invoke(question)
+    query = extract_search_query_from_question(question)
+    docs = retriever.invoke(query)
     doc_text = (
         "\n".join(
             [f"【文档片段{i+1}】\n{doc.page_content}" for i, doc in enumerate(docs)]

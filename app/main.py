@@ -111,7 +111,7 @@ driver = GraphDatabase.driver(uri, auth=(user, password))
 @app.get("/graph")
 async def get_graph():
     with driver.session() as session:
-        result = session.run("MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 100")
+        result = session.run("MATCH (n)-[r]->(m) RETURN n, r, m")
 
         nodes_map = {}
         links = []
